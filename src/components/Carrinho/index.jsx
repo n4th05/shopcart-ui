@@ -277,6 +277,10 @@ export default function Carrinho() {
   return (
     <Container maxWidth="xl" sx={{ marginTop: 4, marginBottom: 4 }}>
       <Typography variant="h5" sx={{ mb: 2, p: 2 }}>Gerenciamento de Carrinhos</Typography>
+
+      <Typography variant="subtitle1" sx={{ mb: 2, p: 2 }}>
+        Total de Carrinhos: {rows.length}
+      </Typography>
       
       <div style={{ padding: '0 16px', display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
         <Button

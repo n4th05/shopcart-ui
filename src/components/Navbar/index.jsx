@@ -20,11 +20,11 @@ const Navbar = () => {
         <StyledLink to="/produtos">
           <MenuItem>Produto</MenuItem>
         </StyledLink>
-        <StyledLink to="/item">
-          <MenuItem>Item</MenuItem>
-        </StyledLink>
         <StyledLink to="/carrinho">
           <MenuItem>Carrinho</MenuItem>
+        </StyledLink>
+        <StyledLink to="/item">
+          <MenuItem>Item</MenuItem>
         </StyledLink>
       </StyledToobar>
     </AppBar>

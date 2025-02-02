@@ -11,25 +11,57 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useState, useEffect } from 'react';
 
 export default function Item() {
-  const [rows, setRows] = useState([]);
-  const [postData, setPostData] = useState({
+  const defaultPostData = {
     produto: {
-      id: 0,
-      nome: ''
+      id: undefined
     },
     quantidade: 0,
-    unidadeDeMedida: 'unidade'
-  });
+    unidadeDeMedida: 'unidade',
+    carrinho: {
+      id: undefined
+    }
+  }
+  const [rows, setRows] = useState([]);
+  const [postData, setPostData] = useState(defaultPostData);
   const [open, setOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [produtos, setProdutos] = useState([]);
+  const [carrinhos, setCarrinhos] = useState([]);
 
   const unidadesMedida = ['unidade', 'kg', 'litro', 'metro'];
 
-  const filteredRows = rows.filter(item =>
+  const filteredRows = searchTerm ? rows.filter(item =>
     item?.produto?.nome?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : rows;
+
+  const fetchProdutos = async () => {
+    try {
+      const response = await fetch('https://localhost:7074/api/Produto');
+      if (!response.ok) {
+        throw new Error('Erro na requisição');
+      }
+      const data = await response.json();
+      setProdutos(data);
+    } catch (error) {
+      console.error('Erro ao buscar produtos:', error);
+    }
+  };
+
+  const fetchCarrinhos = async () => {
+    try {
+      const response = await fetch('https://localhost:7074/api/Carrinho');
+      if (!response.ok) {
+        throw new Error('Erro na requisição');
+      }
+      const data = await response.json();
+      
+      setCarrinhos(data);
+    } catch (error) {
+      console.error('Erro ao buscar carrinhos:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -47,27 +79,29 @@ export default function Item() {
   const postDataToAPI = async () => {
     try {
       setIsLoading(true);
+      
+      // Prepare the data with carrinho
+      const dataToSend = {
+        ...postData,
+        quantidade: Number(postData.quantidade),
+      };
+
       const response = await fetch('https://localhost:7074/api/Item', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(postData),
+        body: JSON.stringify(dataToSend),
       });
 
       if (!response.ok) {
-        throw new Error('Erro na requisição');
+        const errorData = await response.text();
+        throw new Error(`Erro na requisição: ${errorData}`);
       }
+      
       const data = await response.json();
       setRows(prevRows => [data, ...prevRows]);
-      setPostData({
-        produto: {
-          id: 0,
-          nome: ''
-        },
-        quantidade: 0,
-        unidadeDeMedida: 'unidade'
-      });
+      setPostData(defaultPostData);
       setOpen(false);
     } catch (error) {
       console.error('Erro ao enviar dados:', error);
@@ -97,31 +131,37 @@ export default function Item() {
 
   const updateItem = async () => {
     if (!editItem) return;
-  
+
     try {
       setIsLoading(true);
-      
+
+      const dataToUpdate = {
+        ...editItem,
+        quantidade: Number(editItem.quantidade)
+      };
+
       const response = await fetch(`https://localhost:7074/api/Item/${editItem.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editItem),
+        body: JSON.stringify(dataToUpdate),
       });
-  
+
       if (!response.ok) {
-        throw new Error('Erro ao atualizar o item');
+        const errorData = await response.text();
+        throw new Error(`Erro ao atualizar o item: ${errorData}`);
       }
-  
-      setRows(prevRows => 
-        prevRows.map(row => 
+
+      setRows(prevRows =>
+        prevRows.map(row =>
           row.id === editItem.id ? editItem : row
         )
       );
-      
+
       handleClose();
       await fetchData();
-      
+
     } catch (error) {
       console.error('Erro ao atualizar o item:', error);
     } finally {
@@ -130,32 +170,26 @@ export default function Item() {
   };
 
   const handleClickOpenEdit = (item) => {
-    setEditItem({ ...item });
+    setEditItem(item);
     setOpen(true);
   };
 
   const handleClose = () => {
     setOpen(false);
     setEditItem(null);
-    setPostData({
-      produto: {
-        id: 0,
-        nome: ''
-      },
-      quantidade: 0,
-      unidadeDeMedida: 'unidade'
-    });
+    setPostData(defaultPostData);
   };
 
   useEffect(() => {
     fetchData();
+    fetchProdutos();
+    fetchCarrinhos();
   }, []);
 
   return (
     <Container maxWidth="xl" sx={{ marginTop: 4, marginBottom: 4 }}>
       <Typography variant="h5" sx={{ mb: 2, p: 2 }}>Gerenciamento de Itens</Typography>
-      
-      {/* Exibir a quantidade de registros */}
+
       <Typography variant="subtitle1" sx={{ mb: 2, p: 2 }}>
         Total de itens cadastrados: {rows.length}
       </Typography>
@@ -177,14 +211,14 @@ export default function Item() {
         >
           Atualizar Lista
         </Button>
-        
+
         <TextField
           variant="outlined"
           size="small"
           placeholder="Pesquisar itens..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          sx={{ 
+          sx={{
             marginLeft: 'auto',
             width: '300px'
           }}
@@ -201,42 +235,93 @@ export default function Item() {
       <Dialog open={open} onClose={handleClose}>
         <DialogTitle>{editItem ? 'Editar Item' : 'Adicionar Novo Item'}</DialogTitle>
         <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Nome do Produto"
-            type="text"
-            fullWidth
-            variant="outlined"
-            value={editItem ? editItem.produto.nome : postData.produto.nome}
-            onChange={(e) => {
-              if (editItem) {
-                setEditItem({
-                  ...editItem,
-                  produto: { ...editItem.produto, nome: e.target.value }
-                });
-              } else {
-                setPostData({
-                  ...postData,
-                  produto: { ...postData.produto, nome: e.target.value }
-                });
-              }
-            }}
-          />
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Selecione um Produto</InputLabel>
+            <Select
+              value={editItem ? editItem.produto.id : postData.produto.id}
+              label="Selecione um Produto"
+              onChange={(e) => {
+                const selectedId = parseInt(e.target.value);
+                const produto = produtos.find(p => p.id === selectedId);
+                if (editItem) {
+                  setEditItem({
+                    ...editItem,
+                    produto: {
+                      id: selectedId,
+                      nome: produto ? produto.nome : ''
+                    }
+                  });
+                } else {
+                  setPostData({
+                    ...postData,
+                    produto: {
+                      id: selectedId,
+                      nome: produto ? produto.nome : ''
+                    }
+                  });
+                }
+              }}
+            >
+              <MenuItem value={0}>Selecione um produto</MenuItem>
+              {produtos.map((produto) => (
+                <MenuItem key={produto.id} value={produto.id}>
+                  {produto.nome}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Selecione um Carrinho</InputLabel>
+            <Select
+              value={editItem ? editItem.carrinho.id : postData.carrinho.id}
+              label="Selecione um Carrinho"
+              onChange={(e) => {
+                const selectedId = parseInt(e.target.value);
+                if (editItem) {
+                  setEditItem({
+                    ...editItem,
+                    carrinho: {
+                      id: selectedId,
+                    }
+                  });
+                } else {
+                  setPostData({
+                    ...postData,
+                    carrinho: {
+                      id: selectedId,
+                    }
+                  });
+                }
+              }}
+            >
+              <MenuItem value={0}>Selecione um carrinho</MenuItem>
+              {carrinhos.map((carrinho) => (
+                <MenuItem key={carrinho.id} value={carrinho.id}>
+                  {`Carrinho ${carrinho.id}`}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <TextField
             margin="dense"
             label="Quantidade"
             type="number"
             fullWidth
             variant="outlined"
-            value={editItem ? editItem.quantidade : postData.quantidade}
+            value={editItem ? editItem.quantidade || '' : postData.quantidade || ''}
             onChange={(e) => {
-              const value = parseFloat(e.target.value);
-              if (editItem) {
-                setEditItem({ ...editItem, quantidade: value });
-              } else {
-                setPostData({ ...postData, quantidade: value });
+              const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+              if (!isNaN(value)) {
+                if (editItem) {
+                  setEditItem({ ...editItem, quantidade: value });
+                } else {
+                  setPostData({ ...postData, quantidade: value });
+                }
               }
+            }}
+            inputProps={{
+              min: 0,
+              step: "any"
             }}
           />
           <FormControl fullWidth margin="dense">
@@ -264,10 +349,10 @@ export default function Item() {
           <Button onClick={handleClose} color="secondary" disabled={isLoading}>
             Cancelar
           </Button>
-          <Button 
-            onClick={editItem ? updateItem : postDataToAPI} 
+          <Button
+            onClick={editItem ? updateItem : postDataToAPI}
             color="primary"
-            disabled={isLoading}
+            disabled={isLoading || (editItem ? !editItem.produto.id : !postData.produto.id)}
           >
             {editItem ? 'Salvar Alterações' : 'Adicionar'}
           </Button>
